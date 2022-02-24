@@ -24,7 +24,7 @@ void modbusSlave::setBaud(word baud)
 	//calculate the time perdiod for 3 characters for the given bps in ms.
 	_frameDelay = 24000/_baud;
 
-	_serial->begin(baud);
+	// _serial->begin(baud);
 
 	// defaults to 8-bit, no parity, 1 stop bit
 	//clear parity, stop bits, word length
