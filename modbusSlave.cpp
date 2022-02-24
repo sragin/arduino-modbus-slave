@@ -1,11 +1,18 @@
-#include <modbusSlave.h>
-#include <modbus.h>
-#include <modbusDevice.h>
+#include "modbusSlave.h"
+#include "modbus.h"
+#include "modbusDevice.h"
 #include <Arduino.h>
 
 modbusSlave::modbusSlave()
+:_device(nullptr), _msg(nullptr), _serial(&Serial), _len(0), _baud(0), _crc(0), _frameDelay(0)
 {
 }
+
+void modbusSlave::setPort(Stream *port)
+{
+	_serial = port;
+}
+
 /*
 Set the Serial Baud rate.
 Reconfigure the UART for 8 data bits, no parity, and 1 stop bit.
@@ -17,7 +24,7 @@ void modbusSlave::setBaud(word baud)
 	//calculate the time perdiod for 3 characters for the given bps in ms.
 	_frameDelay = 24000/_baud;
 
-	Serial.begin(baud);
+	_serial->begin(baud);
 
 	// defaults to 8-bit, no parity, 1 stop bit
 	//clear parity, stop bits, word length
@@ -33,11 +40,11 @@ void modbusSlave::setBaud(word baud)
 	//1 Stop bit
 //	UCSR0C = UCSR0C | B00000100;
 
-	Serial.flush();
+	_serial->flush();
 }
 
 /*
-Retrieve the serial baud rate
+Retrieve the _serial baud rate
 */
 word modbusSlave::getBaud(void)
 {
@@ -74,10 +81,10 @@ void modbusSlave::calcCrc(void)
 void modbusSlave::checkSerial(void)
 {
 	//while there is more data in the UART than when last checked
-	while(Serial.available()> _len)
+	while(_serial->available()> _len)
 	{
 		//update the incoming query message length
-		_len = Serial.available();
+		_len = _serial->available();
 		//Wait for 3 bytewidths of data (SOM/EOM)
 //		delayMicroseconds(RTUFRAMETIME);
 		delay(_frameDelay);
@@ -97,7 +104,7 @@ void modbusSlave::serialRx(void)
 
 		//copy the query byte for byte to the new buffer
 		for (i=0 ; i < _len ; i++)
-			_msg[i] = Serial.read();
+			_msg[i] = _serial->read();
 }
 
 /*
@@ -136,16 +143,21 @@ void modbusSlave::getDigitalStatus(byte funcType, word startreg, word numregs)
 	_msg[2] = _len-5;
 
 	//For the quantity of registers queried
+	word i = 0;
 	while(numregs--)
 	{
 		//if a value is found for the current register, set bit number bitn of msg[3]
 		//else clear it
 		if(_device->get(startreg))
-			bitSet(_msg[3], bitn);
+			bitSet(_msg[3 + i], bitn);
 		else
-			bitClear(_msg[3], bitn);
+			bitClear(_msg[3 + i], bitn);
 		//increment the bit index
 		bitn++;
+		if (bitn == 8) {
+			bitn = 0;
+			i++;
+		}
 		//increment the register
 		startreg++;
 	}
@@ -254,8 +266,6 @@ void modbusSlave::run(void)
 	word field1;
 	word field2;
 	
-	int i;
-	
 	//initialize mesasge length
 	_len = 0;
 
@@ -293,7 +303,7 @@ void modbusSlave::run(void)
 
 	//copy field 2 from the incoming query
 	field2  = (_msg[4] << 8) | _msg[5];
-	
+
 	//free the allocated memory for the query message
 	free(_msg);
 	//reset the message length;
@@ -332,7 +342,7 @@ void modbusSlave::run(void)
 		//send the reply to the serial UART
 		//Senguino doesn't support a bulk serial write command....
 		for(i = 0 ; i < _len ; i++)
-			Serial.write(_msg[i]);
+			_serial->write(_msg[i]);
 		//free the allocated memory for the reply message
 		free(_msg);
 		//reset the message length

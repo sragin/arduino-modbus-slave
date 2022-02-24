@@ -4,8 +4,8 @@
 #ifndef _MODBUSDEVICE
 #define _MODBUSDEVICE
 
-#include <modbusRegBank.h>
-#include <modbus.h>
+#include "modbusRegBank.h"
+#include "modbus.h"
 //#include <Wprogram.h>
 
 class modbusDevice:public modbusRegBank
